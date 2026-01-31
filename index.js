@@ -184,11 +184,11 @@ app.post('/api/art', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid title (string, max 128 chars)' });
     }
     
-    // Validate size (32x32 only for now)
-    if (size !== 32) {
+    // Validate size (16x16 or 32x32)
+    if (size !== 16 && size !== 32) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Size must be 32 (32x32 pixels)' 
+        error: 'Size must be 16 or 32' 
       });
     }
     
@@ -416,7 +416,7 @@ app.get('/art/:id', async (req, res) => {
     }
     .canvas {
       display: grid;
-      grid-template-columns: repeat(32, 1fr);
+      grid-template-columns: repeat(${row.size}, 1fr);
       gap: 0;
       width: min(100%, 512px);
       aspect-ratio: 1;
