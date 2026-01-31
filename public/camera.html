@@ -363,6 +363,13 @@
       const prompt = document.getElementById('camera-prompt');
       const captureBtn = document.getElementById('capture-btn');
       
+      // Check if mediaDevices is available (requires HTTPS on mobile)
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        prompt.innerHTML = '<p>📷 Camera not supported</p><p><small>Requires HTTPS on mobile</small></p>';
+        prompt.classList.remove('hidden');
+        return;
+      }
+      
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { 
@@ -382,7 +389,7 @@
         } else if (err.name === 'NotFoundError') {
           prompt.innerHTML = '<p>📷 No camera found</p>';
         } else {
-          prompt.innerHTML = '<p>📷 Camera error</p><p><small>' + err.message + '</small></p>';
+          prompt.innerHTML = '<p>📷 Camera error</p><p><small>' + (err.message || 'Unknown error') + '</small></p>';
         }
         prompt.classList.remove('hidden');
       }
