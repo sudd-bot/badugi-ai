@@ -538,6 +538,7 @@ app.get('/art/:id', async (req, res) => {
 // Static pages
 app.get('/', (req, res) => res.sendFile(join(__dirname, 'public', 'index.html')));
 app.get('/draw', (req, res) => res.sendFile(join(__dirname, 'public', 'draw.html')));
+app.get('/camera', (req, res) => res.sendFile(join(__dirname, 'public', 'camera.html')));
 app.get('/api', (req, res) => res.sendFile(join(__dirname, 'public', 'api.html')));
 
 app.get('/remix/:id', async (req, res) => {

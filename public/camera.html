@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camera — Badugi.ai</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Monaco', 'Menlo', monospace;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #333;
+    }
+    
+    .logo {
+      font-size: 1.25rem;
+      color: #ff6b6b;
+      text-decoration: none;
+    }
+    .logo span { color: #4ecdc4; }
+    
+    .main {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    
+    @media (min-width: 700px) {
+      .main {
+        flex-direction: row;
+      }
+      .camera-section, .result-section {
+        flex: 1;
+      }
+    }
+    
+    .panel {
+      background: #16161e;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .panel h3 {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+    }
+    
+    .video-container {
+      position: relative;
+      background: #000;
+      border-radius: 6px;
+      overflow: hidden;
+      aspect-ratio: 1;
+      max-width: 320px;
+    }
+    
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .capture-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: #4ecdc4;
+      border: none;
+      border-radius: 6px;
+      color: #0a0a0f;
+      font-family: inherit;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    
+    .capture-btn:hover {
+      background: #45b7aa;
+    }
+    
+    .capture-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    
+    .canvas-container {
+      display: flex;
+      justify-content: center;
+    }
+    
+    .pixel-canvas {
+      display: grid;
+      grid-template-columns: repeat(32, 1fr);
+      gap: 0;
+      width: 100%;
+      max-width: 320px;
+      aspect-ratio: 1;
+      background: #0a0a0f;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    
+    .pixel {
+      aspect-ratio: 1;
+    }
+    
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .control-row label {
+      flex: 1;
+      font-size: 0.85rem;
+      color: #888;
+    }
+    
+    .control-row input[type="range"] {
+      flex: 2;
+    }
+    
+    .control-row .value {
+      width: 2rem;
+      text-align: right;
+      font-size: 0.85rem;
+      color: #4ecdc4;
+    }
+    
+    .palette-preview {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+    
+    .palette-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      border: 1px solid #333;
+    }
+    
+    .publish-section input {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: inherit;
+    }
+    
+    .publish-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: #ff6b6b;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    
+    .publish-btn:hover {
+      background: #ff5252;
+    }
+    
+    .publish-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    
+    .message {
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+    
+    .message.success { background: #1a3a2a; color: #4ecdc4; }
+    .message.error { background: #3a1a1a; color: #ff6b6b; }
+    
+    .hidden { display: none !important; }
+    
+    .no-camera {
+      padding: 2rem;
+      text-align: center;
+      color: #888;
+    }
+    
+    .action-btns {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    
+    .action-btn {
+      flex: 1;
+      padding: 0.5rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #888;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+    }
+    
+    .action-btn:hover {
+      color: #e0e0e0;
+      border-color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="/" class="logo">🎨 Badugi<span>.ai</span></a>
+    </header>
+    
+    <div class="main">
+      <div class="camera-section">
+        <div class="panel">
+          <h3>📷 Camera</h3>
+          <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+          </div>
+          <button class="capture-btn" id="capture-btn" disabled>📸 Capture</button>
+        </div>
+        
+        <div class="panel">
+          <h3>⚙️ Settings</h3>
+          <div class="controls">
+            <div class="control-row">
+              <label>Colors</label>
+              <input type="range" id="color-count" min="4" max="24" value="12">
+              <span class="value" id="color-count-val">12</span>
+            </div>
+            <div class="control-row">
+              <label>Contrast</label>
+              <input type="range" id="contrast" min="50" max="200" value="100">
+              <span class="value" id="contrast-val">100</span>
+            </div>
+            <div class="control-row">
+              <label>Saturation</label>
+              <input type="range" id="saturation" min="50" max="200" value="120">
+              <span class="value" id="saturation-val">120</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="result-section">
+        <div class="panel">
+          <h3>🎨 Result</h3>
+          <div class="canvas-container">
+            <div class="pixel-canvas" id="pixel-canvas"></div>
+          </div>
+          <div class="palette-preview" id="palette-preview"></div>
+          <div class="action-btns">
+            <button class="action-btn" id="edit-btn" disabled>✏️ Edit in Draw</button>
+            <button class="action-btn" id="recapture-btn" disabled>🔄 Recapture</button>
+          </div>
+        </div>
+        
+        <div class="panel publish-section">
+          <h3>Publish</h3>
+          <input type="text" id="author" placeholder="Your name" maxlength="64">
+          <input type="text" id="title" placeholder="Title (optional)" maxlength="128">
+          <button class="publish-btn" id="publish-btn" disabled>Publish 📸</button>
+          <div class="message hidden" id="message"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Hidden canvas for processing -->
+  <canvas id="work-canvas" style="display: none;"></canvas>
+  
+  <script>
+    const SIZE = 32;
+    let stream = null;
+    let currentPixels = null;
+    let currentPalette = null;
+    
+    const video = document.getElementById('video');
+    const workCanvas = document.getElementById('work-canvas');
+    const ctx = workCanvas.getContext('2d', { willReadFrequently: true });
+    workCanvas.width = SIZE;
+    workCanvas.height = SIZE;
+    
+    // Start camera
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 320 } }
+        });
+        video.srcObject = stream;
+        document.getElementById('capture-btn').disabled = false;
+      } catch (err) {
+        console.error('Camera error:', err);
+        document.querySelector('.video-container').innerHTML = 
+          '<div class="no-camera">📷 Camera not available<br><small>Check permissions</small></div>';
+      }
+    }
+    
+    // K-means color quantization
+    function quantizeColors(imageData, numColors) {
+      const pixels = [];
+      const data = imageData.data;
+      
+      // Collect all pixels
+      for (let i = 0; i < data.length; i += 4) {
+        pixels.push([data[i], data[i + 1], data[i + 2]]);
+      }
+      
+      // Initialize centroids randomly
+      let centroids = [];
+      const used = new Set();
+      while (centroids.length < numColors) {
+        const idx = Math.floor(Math.random() * pixels.length);
+        const key = pixels[idx].join(',');
+        if (!used.has(key)) {
+          used.add(key);
+          centroids.push([...pixels[idx]]);
+        }
+      }
+      
+      // K-means iterations
+      for (let iter = 0; iter < 10; iter++) {
+        const clusters = Array(numColors).fill(null).map(() => []);
+        
+        // Assign pixels to nearest centroid
+        for (const pixel of pixels) {
+          let minDist = Infinity;
+          let closest = 0;
+          for (let c = 0; c < centroids.length; c++) {
+            const dist = Math.pow(pixel[0] - centroids[c][0], 2) +
+                         Math.pow(pixel[1] - centroids[c][1], 2) +
+                         Math.pow(pixel[2] - centroids[c][2], 2);
+            if (dist < minDist) {
+              minDist = dist;
+              closest = c;
+            }
+          }
+          clusters[closest].push(pixel);
+        }
+        
+        // Update centroids
+        for (let c = 0; c < centroids.length; c++) {
+          if (clusters[c].length > 0) {
+            centroids[c] = [
+              Math.round(clusters[c].reduce((s, p) => s + p[0], 0) / clusters[c].length),
+              Math.round(clusters[c].reduce((s, p) => s + p[1], 0) / clusters[c].length),
+              Math.round(clusters[c].reduce((s, p) => s + p[2], 0) / clusters[c].length)
+            ];
+          }
+        }
+      }
+      
+      return centroids;
+    }
+    
+    // Convert RGB to hex
+    function rgbToHex(r, g, b) {
+      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+    }
+    
+    // Find nearest color in palette
+    function nearestColor(r, g, b, palette) {
+      let minDist = Infinity;
+      let nearest = 0;
+      for (let i = 0; i < palette.length; i++) {
+        const dist = Math.pow(r - palette[i][0], 2) +
+                     Math.pow(g - palette[i][1], 2) +
+                     Math.pow(b - palette[i][2], 2);
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = i;
+        }
+      }
+      return nearest;
+    }
+    
+    // Capture and process frame
+    function capture() {
+      const numColors = parseInt(document.getElementById('color-count').value);
+      const contrast = parseInt(document.getElementById('contrast').value) / 100;
+      const saturation = parseInt(document.getElementById('saturation').value) / 100;
+      
+      // Draw video frame to canvas (cropped square)
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const size = Math.min(vw, vh);
+      const sx = (vw - size) / 2;
+      const sy = (vh - size) / 2;
+      
+      ctx.drawImage(video, sx, sy, size, size, 0, 0, SIZE, SIZE);
+      
+      // Apply contrast and saturation
+      let imageData = ctx.getImageData(0, 0, SIZE, SIZE);
+      const data = imageData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        let r = data[i], g = data[i + 1], b = data[i + 2];
+        
+        // Contrast
+        r = Math.max(0, Math.min(255, ((r / 255 - 0.5) * contrast + 0.5) * 255));
+        g = Math.max(0, Math.min(255, ((g / 255 - 0.5) * contrast + 0.5) * 255));
+        b = Math.max(0, Math.min(255, ((b / 255 - 0.5) * contrast + 0.5) * 255));
+        
+        // Saturation
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        r = Math.max(0, Math.min(255, gray + (r - gray) * saturation));
+        g = Math.max(0, Math.min(255, gray + (g - gray) * saturation));
+        b = Math.max(0, Math.min(255, gray + (b - gray) * saturation));
+        
+        data[i] = r;
+        data[i + 1] = g;
+        data[i + 2] = b;
+      }
+      
+      // Quantize colors
+      const palette = quantizeColors(imageData, numColors);
+      
+      // Map pixels to palette
+      const pixels = [];
+      for (let y = 0; y < SIZE; y++) {
+        const row = [];
+        for (let x = 0; x < SIZE; x++) {
+          const idx = (y * SIZE + x) * 4;
+          const colorIdx = nearestColor(data[idx], data[idx + 1], data[idx + 2], palette);
+          row.push(colorIdx);
+        }
+        pixels.push(row);
+      }
+      
+      // Store result
+      currentPalette = palette.map(c => rgbToHex(c[0], c[1], c[2]));
+      currentPixels = pixels;
+      
+      // Render result
+      renderResult();
+      
+      // Enable buttons
+      document.getElementById('publish-btn').disabled = false;
+      document.getElementById('edit-btn').disabled = false;
+      document.getElementById('recapture-btn').disabled = false;
+    }
+    
+    function renderResult() {
+      const canvas = document.getElementById('pixel-canvas');
+      canvas.innerHTML = '';
+      
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const pixel = document.createElement('div');
+          pixel.className = 'pixel';
+          pixel.style.backgroundColor = currentPalette[currentPixels[y][x]];
+          canvas.appendChild(pixel);
+        }
+      }
+      
+      // Show palette
+      const paletteEl = document.getElementById('palette-preview');
+      paletteEl.innerHTML = '';
+      currentPalette.forEach(color => {
+        const div = document.createElement('div');
+        div.className = 'palette-color';
+        div.style.backgroundColor = color;
+        div.title = color;
+        paletteEl.appendChild(div);
+      });
+    }
+    
+    async function publish() {
+      const author = document.getElementById('author').value.trim();
+      const title = document.getElementById('title').value.trim();
+      const msg = document.getElementById('message');
+      
+      if (!author) {
+        msg.className = 'message error';
+        msg.textContent = 'Enter your name';
+        msg.classList.remove('hidden');
+        return;
+      }
+      
+      if (!currentPixels) {
+        msg.className = 'message error';
+        msg.textContent = 'Capture an image first';
+        msg.classList.remove('hidden');
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/art', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            author,
+            title: title || undefined,
+            size: SIZE,
+            palette: currentPalette,
+            pixels: currentPixels
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          msg.className = 'message success';
+          msg.innerHTML = `Published! <a href="${data.url}" style="color: inherit;">View it →</a>`;
+          msg.classList.remove('hidden');
+        } else {
+          msg.className = 'message error';
+          msg.textContent = data.error;
+          msg.classList.remove('hidden');
+        }
+      } catch (err) {
+        msg.className = 'message error';
+        msg.textContent = 'Network error';
+        msg.classList.remove('hidden');
+      }
+    }
+    
+    function editInDraw() {
+      // Store in sessionStorage and redirect
+      sessionStorage.setItem('importedArt', JSON.stringify({
+        palette: currentPalette,
+        pixels: currentPixels
+      }));
+      window.location.href = '/draw?import=session';
+    }
+    
+    // Event listeners
+    document.getElementById('capture-btn').onclick = capture;
+    document.getElementById('publish-btn').onclick = publish;
+    document.getElementById('recapture-btn').onclick = capture;
+    document.getElementById('edit-btn').onclick = editInDraw;
+    
+    // Slider updates
+    ['color-count', 'contrast', 'saturation'].forEach(id => {
+      const slider = document.getElementById(id);
+      const display = document.getElementById(id + '-val');
+      slider.oninput = () => {
+        display.textContent = slider.value;
+        if (currentPixels) capture(); // Re-process with new settings
+      };
+    });
+    
+    // Init
+    startCamera();
+  </script>
+</body>
+</html>

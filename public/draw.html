@@ -655,10 +655,52 @@
       }
     });
     
+    // Check for imported art from camera
+    function checkImport() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('import') === 'session') {
+        const imported = sessionStorage.getItem('importedArt');
+        if (imported) {
+          try {
+            const { palette, pixels: importedPixels } = JSON.parse(imported);
+            
+            // Load pixels
+            for (let y = 0; y < SIZE; y++) {
+              for (let x = 0; x < SIZE; x++) {
+                const color = palette[importedPixels[y][x]];
+                setPixelColor(x, y, color);
+              }
+            }
+            
+            // Update palette display
+            const paletteEl = document.getElementById('palette');
+            paletteEl.innerHTML = '';
+            palette.forEach(color => {
+              const swatch = document.createElement('div');
+              swatch.className = 'palette-color';
+              swatch.style.backgroundColor = color;
+              swatch.dataset.color = color;
+              paletteEl.appendChild(swatch);
+            });
+            
+            setColor(palette[1] || palette[0]);
+            saveHistory();
+            sessionStorage.removeItem('importedArt');
+            
+            // Clear URL params
+            window.history.replaceState({}, '', '/draw');
+          } catch (e) {
+            console.error('Import error:', e);
+          }
+        }
+      }
+    }
+    
     // Init
     initCanvas();
     initPalette();
     setColor(currentColor);
+    checkImport();
   </script>
 </body>
 </html>
