@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remix — Badugi.ai</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Monaco', 'Menlo', monospace;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 1rem;
+      user-select: none;
+    }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #333;
+    }
+    
+    .logo {
+      font-size: 1.25rem;
+      color: #ff6b6b;
+      text-decoration: none;
+    }
+    .logo span { color: #4ecdc4; }
+    
+    .original-info {
+      font-size: 0.85rem;
+      color: #888;
+    }
+    .original-info a { color: #4ecdc4; }
+    
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .editor {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    @media (min-width: 800px) {
+      .editor {
+        flex-direction: row;
+      }
+    }
+    
+    .canvas-area {
+      flex: 1;
+    }
+    
+    .canvas-wrapper {
+      position: relative;
+    }
+    
+    .canvas {
+      display: grid;
+      grid-template-columns: repeat(32, 1fr);
+      gap: 0;
+      width: 100%;
+      max-width: 512px;
+      aspect-ratio: 1;
+      background: #16161e;
+      border-radius: 4px;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    
+    .pixel {
+      aspect-ratio: 1;
+      border: 1px solid rgba(255,255,255,0.03);
+      position: relative;
+    }
+    
+    .pixel.changed::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 4px;
+      height: 4px;
+      background: #4ecdc4;
+      border-radius: 50%;
+    }
+    
+    .pixel:hover {
+      opacity: 0.8;
+    }
+    
+    .change-meter {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      background: #16161e;
+      border-radius: 6px;
+    }
+    
+    .meter-bar {
+      height: 8px;
+      background: #0a0a0f;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+    
+    .meter-fill {
+      height: 100%;
+      background: #4ecdc4;
+      transition: width 0.2s, background 0.2s;
+    }
+    
+    .meter-fill.warning { background: #ffa502; }
+    .meter-fill.danger { background: #ff4757; }
+    
+    .meter-text {
+      font-size: 0.8rem;
+      color: #888;
+    }
+    
+    .sidebar {
+      width: 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .panel {
+      background: #16161e;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    
+    .panel h3 {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+    }
+    
+    .tools {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .tool {
+      flex: 1;
+      padding: 0.75rem;
+      background: #0a0a0f;
+      border: 2px solid #333;
+      border-radius: 6px;
+      color: #e0e0e0;
+      cursor: pointer;
+      font-size: 1.25rem;
+      text-align: center;
+    }
+    
+    .tool.active {
+      border-color: #4ecdc4;
+      background: #1a2a2a;
+    }
+    
+    .tool:hover {
+      border-color: #555;
+    }
+    
+    .color-current {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .color-preview {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      border: 2px solid #333;
+    }
+    
+    .color-input {
+      flex: 1;
+      padding: 0.5rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 4px;
+    }
+    
+    .palette-color {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    
+    .palette-color:hover {
+      transform: scale(1.1);
+    }
+    
+    .palette-color.active {
+      border-color: #fff;
+    }
+    
+    .palette-color.from-original {
+      box-shadow: 0 0 0 1px #4ecdc4;
+    }
+    
+    .publish-section input {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: inherit;
+    }
+    
+    .publish-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: #4ecdc4;
+      border: none;
+      border-radius: 6px;
+      color: #0a0a0f;
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    
+    .publish-btn:hover {
+      background: #45b7aa;
+    }
+    
+    .publish-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .action-btn {
+      flex: 1;
+      padding: 0.5rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #888;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.75rem;
+    }
+    
+    .action-btn:hover {
+      color: #e0e0e0;
+      border-color: #555;
+    }
+    
+    .message {
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+    
+    .message.success {
+      background: #1a3a2a;
+      color: #4ecdc4;
+    }
+    
+    .message.error {
+      background: #3a1a1a;
+      color: #ff6b6b;
+    }
+    
+    .hidden { display: none !important; }
+    
+    .loading {
+      text-align: center;
+      padding: 4rem;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="/" class="logo">🎨 Badugi<span>.ai</span></a>
+      <div class="original-info" id="original-info"></div>
+    </header>
+    
+    <div id="loading" class="loading">Loading original...</div>
+    
+    <div class="editor hidden" id="editor">
+      <div class="canvas-area">
+        <div class="canvas-wrapper">
+          <div class="canvas" id="canvas"></div>
+        </div>
+        <div class="change-meter">
+          <div class="meter-bar">
+            <div class="meter-fill" id="meter-fill"></div>
+          </div>
+          <div class="meter-text">
+            <span id="change-count">0</span> / <span id="max-changes">512</span> pixels changed (50% max)
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar">
+        <div class="panel">
+          <h3>Tools</h3>
+          <div class="tools">
+            <button class="tool active" id="tool-pencil" title="Pencil">✏️</button>
+            <button class="tool" id="tool-eraser" title="Restore original">↩️</button>
+          </div>
+        </div>
+        
+        <div class="panel">
+          <h3>Color</h3>
+          <div class="color-current">
+            <div class="color-preview" id="color-preview"></div>
+            <input type="text" class="color-input" id="color-input" value="#ff6b6b" maxlength="7">
+          </div>
+          <div class="palette" id="palette"></div>
+        </div>
+        
+        <div class="panel">
+          <h3>Canvas</h3>
+          <div class="actions">
+            <button class="action-btn" id="btn-reset">Reset to Original</button>
+            <button class="action-btn" id="btn-undo">Undo</button>
+          </div>
+        </div>
+        
+        <div class="panel publish-section">
+          <h3>Publish Remix</h3>
+          <input type="text" id="author" placeholder="Your name" maxlength="64">
+          <input type="text" id="title" placeholder="Title (optional)" maxlength="128">
+          <button class="publish-btn" id="btn-publish">Publish Remix 🔀</button>
+          <div class="message hidden" id="message"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    const SIZE = 32;
+    const MAX_CHANGES = Math.floor(SIZE * SIZE * 0.5); // 512
+    
+    // Default palette (will merge with original's)
+    const defaultPalette = [
+      '#0a0a0f', '#1a1a2e', '#16213e', '#0f3460',
+      '#e94560', '#ff6b6b', '#ffa502', '#ffda79',
+      '#7bed9f', '#2ed573', '#1e90ff', '#70a1ff',
+      '#5352ed', '#a29bfe', '#ff4757', '#ff6348',
+      '#ffffff', '#f1f2f6', '#ced6e0', '#a4b0be'
+    ];
+    
+    let originalId = null;
+    let originalPixels = []; // Colors, not indices
+    let currentPixels = [];
+    let currentColor = '#ff6b6b';
+    let currentTool = 'pencil';
+    let isDrawing = false;
+    let history = [];
+    let changedCount = 0;
+    
+    async function loadOriginal() {
+      const pathParts = window.location.pathname.split('/');
+      originalId = pathParts[pathParts.length - 1];
+      
+      try {
+        const res = await fetch(`/api/art/${originalId}`);
+        const data = await res.json();
+        
+        if (!data.success) {
+          document.getElementById('loading').textContent = 'Art not found';
+          return;
+        }
+        
+        const art = data.art;
+        document.getElementById('original-info').innerHTML = 
+          `Remixing: <a href="/art/${art.id}">${art.title || 'Untitled'}</a> by ${art.author}`;
+        
+        // Convert indexed pixels to colors
+        originalPixels = art.pixels.map(row => 
+          row.map(idx => art.palette[idx])
+        );
+        
+        // Build merged palette (original + defaults)
+        const allColors = new Set([...art.palette, ...defaultPalette]);
+        initPalette([...allColors], art.palette);
+        
+        // Initialize canvas with original art
+        initCanvas();
+        
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('editor').classList.remove('hidden');
+      } catch (err) {
+        document.getElementById('loading').textContent = 'Error loading art';
+        console.error(err);
+      }
+    }
+    
+    function initCanvas() {
+      const canvas = document.getElementById('canvas');
+      canvas.innerHTML = '';
+      currentPixels = [];
+      
+      for (let y = 0; y < SIZE; y++) {
+        const row = [];
+        for (let x = 0; x < SIZE; x++) {
+          const color = originalPixels[y][x];
+          const pixel = document.createElement('div');
+          pixel.className = 'pixel';
+          pixel.style.backgroundColor = color;
+          pixel.dataset.x = x;
+          pixel.dataset.y = y;
+          canvas.appendChild(pixel);
+          row.push(color);
+        }
+        currentPixels.push(row);
+      }
+      
+      updateChangeMeter();
+      saveHistory();
+    }
+    
+    function initPalette(colors, originalColors) {
+      const palette = document.getElementById('palette');
+      palette.innerHTML = '';
+      
+      const origSet = new Set(originalColors);
+      
+      colors.slice(0, 24).forEach(color => {
+        const swatch = document.createElement('div');
+        swatch.className = 'palette-color';
+        if (origSet.has(color)) swatch.classList.add('from-original');
+        swatch.style.backgroundColor = color;
+        swatch.dataset.color = color;
+        if (color === currentColor) swatch.classList.add('active');
+        palette.appendChild(swatch);
+      });
+    }
+    
+    function setColor(color) {
+      currentColor = color;
+      document.getElementById('color-preview').style.backgroundColor = color;
+      document.getElementById('color-input').value = color;
+      
+      document.querySelectorAll('.palette-color').forEach(el => {
+        el.classList.toggle('active', el.dataset.color === color);
+      });
+    }
+    
+    function setTool(tool) {
+      currentTool = tool;
+      document.querySelectorAll('.tool').forEach(el => el.classList.remove('active'));
+      document.getElementById('tool-' + tool).classList.add('active');
+    }
+    
+    function getPixelAt(x, y) {
+      return document.querySelector(`.pixel[data-x="${x}"][data-y="${y}"]`);
+    }
+    
+    function setPixelColor(x, y, color) {
+      const pixel = getPixelAt(x, y);
+      if (!pixel) return;
+      
+      const wasChanged = currentPixels[y][x] !== originalPixels[y][x];
+      const willChange = color !== originalPixels[y][x];
+      
+      // Check if we're at the limit
+      if (!wasChanged && willChange && changedCount >= MAX_CHANGES) {
+        return; // Can't change more pixels
+      }
+      
+      pixel.style.backgroundColor = color;
+      currentPixels[y][x] = color;
+      
+      // Update changed indicator
+      if (willChange) {
+        pixel.classList.add('changed');
+      } else {
+        pixel.classList.remove('changed');
+      }
+      
+      updateChangeMeter();
+    }
+    
+    function updateChangeMeter() {
+      changedCount = 0;
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          if (currentPixels[y][x] !== originalPixels[y][x]) {
+            changedCount++;
+          }
+        }
+      }
+      
+      const pct = (changedCount / MAX_CHANGES) * 100;
+      const fill = document.getElementById('meter-fill');
+      fill.style.width = Math.min(pct, 100) + '%';
+      fill.className = 'meter-fill';
+      if (pct >= 90) fill.classList.add('danger');
+      else if (pct >= 70) fill.classList.add('warning');
+      
+      document.getElementById('change-count').textContent = changedCount;
+      document.getElementById('max-changes').textContent = MAX_CHANGES;
+    }
+    
+    function draw(e) {
+      const pixel = e.target;
+      if (!pixel.classList.contains('pixel')) return;
+      
+      const x = parseInt(pixel.dataset.x);
+      const y = parseInt(pixel.dataset.y);
+      
+      if (currentTool === 'pencil') {
+        setPixelColor(x, y, currentColor);
+      } else if (currentTool === 'eraser') {
+        // Restore to original
+        setPixelColor(x, y, originalPixels[y][x]);
+      }
+    }
+    
+    function saveHistory() {
+      history.push(currentPixels.map(row => [...row]));
+      if (history.length > 50) history.shift();
+    }
+    
+    function undo() {
+      if (history.length <= 1) return;
+      history.pop();
+      const prev = history[history.length - 1];
+      
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const pixel = getPixelAt(x, y);
+          const color = prev[y][x];
+          pixel.style.backgroundColor = color;
+          currentPixels[y][x] = color;
+          
+          if (color !== originalPixels[y][x]) {
+            pixel.classList.add('changed');
+          } else {
+            pixel.classList.remove('changed');
+          }
+        }
+      }
+      updateChangeMeter();
+    }
+    
+    function resetToOriginal() {
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          setPixelColor(x, y, originalPixels[y][x]);
+        }
+      }
+      saveHistory();
+    }
+    
+    async function publish() {
+      const author = document.getElementById('author').value.trim();
+      const title = document.getElementById('title').value.trim();
+      const msg = document.getElementById('message');
+      
+      if (!author) {
+        msg.className = 'message error';
+        msg.textContent = 'Enter your name';
+        msg.classList.remove('hidden');
+        return;
+      }
+      
+      if (changedCount === 0) {
+        msg.className = 'message error';
+        msg.textContent = 'Make some changes first!';
+        msg.classList.remove('hidden');
+        return;
+      }
+      
+      // Build palette from used colors
+      const usedColors = new Set();
+      currentPixels.forEach(row => row.forEach(c => usedColors.add(c)));
+      const palette = [...usedColors];
+      const colorIndex = {};
+      palette.forEach((c, i) => colorIndex[c] = i);
+      
+      const indexedPixels = currentPixels.map(row => row.map(c => colorIndex[c]));
+      
+      try {
+        const res = await fetch('/api/art', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            author,
+            title: title || undefined,
+            size: SIZE,
+            palette,
+            pixels: indexedPixels,
+            remix_of: originalId
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          msg.className = 'message success';
+          msg.innerHTML = `Published! <a href="${data.url}" style="color: inherit;">View it →</a>`;
+          msg.classList.remove('hidden');
+        } else {
+          msg.className = 'message error';
+          msg.textContent = data.error;
+          msg.classList.remove('hidden');
+        }
+      } catch (err) {
+        msg.className = 'message error';
+        msg.textContent = 'Network error';
+        msg.classList.remove('hidden');
+      }
+    }
+    
+    // Event listeners
+    const canvas = document.getElementById('canvas');
+    
+    canvas.addEventListener('mousedown', (e) => {
+      isDrawing = true;
+      draw(e);
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+      if (isDrawing) draw(e);
+    });
+    
+    canvas.addEventListener('mouseup', () => {
+      if (isDrawing) saveHistory();
+      isDrawing = false;
+    });
+    
+    canvas.addEventListener('mouseleave', () => {
+      if (isDrawing) saveHistory();
+      isDrawing = false;
+    });
+    
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      isDrawing = true;
+      const touch = e.touches[0];
+      const pixel = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (pixel) draw({ target: pixel });
+    });
+    
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!isDrawing) return;
+      const touch = e.touches[0];
+      const pixel = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (pixel) draw({ target: pixel });
+    });
+    
+    canvas.addEventListener('touchend', () => {
+      if (isDrawing) saveHistory();
+      isDrawing = false;
+    });
+    
+    // Tool buttons
+    document.getElementById('tool-pencil').onclick = () => setTool('pencil');
+    document.getElementById('tool-eraser').onclick = () => setTool('eraser');
+    
+    // Palette clicks
+    document.getElementById('palette').addEventListener('click', (e) => {
+      if (e.target.classList.contains('palette-color')) {
+        setColor(e.target.dataset.color);
+      }
+    });
+    
+    // Color input
+    document.getElementById('color-input').addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+        setColor(val);
+      }
+    });
+    
+    // Action buttons
+    document.getElementById('btn-reset').onclick = resetToOriginal;
+    document.getElementById('btn-undo').onclick = undo;
+    document.getElementById('btn-publish').onclick = publish;
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'p') setTool('pencil');
+      if (e.key === 'e') setTool('eraser');
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        undo();
+      }
+    });
+    
+    // Init
+    setColor(currentColor);
+    loadOriginal();
+  </script>
+</body>
+</html>

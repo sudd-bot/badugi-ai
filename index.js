@@ -19,6 +19,7 @@ app.use(express.static(join(__dirname, 'public')));
 // Database setup
 const db = new Database(join(__dirname, 'badugi.db'));
 
+// Create table if not exists
 db.exec(`
   CREATE TABLE IF NOT EXISTS art (
     id TEXT PRIMARY KEY,
@@ -34,6 +35,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_art_created ON art(created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_art_author ON art(author);
 `);
+
+// Migration: add remix_of column if it doesn't exist
+try {
+  db.exec(`ALTER TABLE art ADD COLUMN remix_of TEXT REFERENCES art(id)`);
+  console.log('Added remix_of column');
+} catch (e) {
+  // Column already exists, ignore
+}
+
+// Create index for remix_of (safe to run multiple times with IF NOT EXISTS)
+db.exec(`CREATE INDEX IF NOT EXISTS idx_art_remix ON art(remix_of);`);
 
 // Validation helpers
 function validatePalette(palette) {
@@ -83,7 +95,8 @@ app.get('/api/art', (req, res) => {
     palette: JSON.parse(row.palette),
     pixels: JSON.parse(row.pixels),
     created_at: row.created_at,
-    views: row.views
+    views: row.views,
+    remix_of: row.remix_of || null
   }));
   
   const total = db.prepare('SELECT COUNT(*) as count FROM art').get().count;
@@ -107,6 +120,18 @@ app.get('/api/art/:id', (req, res) => {
   // Increment views
   db.prepare('UPDATE art SET views = views + 1 WHERE id = ?').run(req.params.id);
   
+  // Get original if this is a remix
+  let original = null;
+  if (row.remix_of) {
+    const origRow = db.prepare('SELECT id, author, title FROM art WHERE id = ?').get(row.remix_of);
+    if (origRow) {
+      original = { id: origRow.id, author: origRow.author, title: origRow.title };
+    }
+  }
+  
+  // Get remixes of this piece
+  const remixes = db.prepare('SELECT id, author, title FROM art WHERE remix_of = ? ORDER BY created_at DESC LIMIT 10').all(row.id);
+  
   res.json({
     success: true,
     art: {
@@ -117,14 +142,17 @@ app.get('/api/art/:id', (req, res) => {
       palette: JSON.parse(row.palette),
       pixels: JSON.parse(row.pixels),
       created_at: row.created_at,
-      views: row.views + 1
+      views: row.views + 1,
+      remix_of: row.remix_of || null,
+      original,
+      remixes
     }
   });
 });
 
 // Create new art
 app.post('/api/art', (req, res) => {
-  const { author, title, size, palette, pixels } = req.body;
+  const { author, title, size, palette, pixels, remix_of } = req.body;
   
   // Validate required fields
   if (!author || typeof author !== 'string' || author.length > 64) {
@@ -159,18 +187,60 @@ app.post('/api/art', (req, res) => {
     });
   }
   
+  // Handle remix validation
+  let originalRow = null;
+  if (remix_of) {
+    originalRow = db.prepare('SELECT * FROM art WHERE id = ?').get(remix_of);
+    if (!originalRow) {
+      return res.status(400).json({ success: false, error: 'Original art not found for remix' });
+    }
+    
+    // Check 50% pixel change limit
+    const originalPixels = JSON.parse(originalRow.pixels);
+    const originalPalette = JSON.parse(originalRow.palette);
+    
+    // Convert both to colors for comparison
+    let changedPixels = 0;
+    const maxChanges = Math.floor((size * size) * 0.5); // 50% = 512 pixels
+    
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const originalColor = originalPalette[originalPixels[y][x]];
+        const newColor = palette[pixels[y][x]];
+        if (originalColor !== newColor) {
+          changedPixels++;
+        }
+      }
+    }
+    
+    if (changedPixels > maxChanges) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Too many pixels changed. Remixes can only modify up to 50% (${maxChanges} pixels). You changed ${changedPixels}.`
+      });
+    }
+    
+    if (changedPixels === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No pixels changed. Make some modifications to remix!'
+      });
+    }
+  }
+  
   const id = uuidv4();
   
   db.prepare(`
-    INSERT INTO art (id, author, title, size, palette, pixels)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, author, title || null, size, JSON.stringify(palette), JSON.stringify(pixels));
+    INSERT INTO art (id, author, title, size, palette, pixels, remix_of)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, author, title || null, size, JSON.stringify(palette), JSON.stringify(pixels), remix_of || null);
   
   res.status(201).json({
     success: true,
-    message: 'Art created! 🎨',
+    message: remix_of ? 'Remix published! 🎨🔀' : 'Art created! 🎨',
     id,
-    url: `/art/${id}`
+    url: `/art/${id}`,
+    remix_of: remix_of || null
   });
 });
 
@@ -248,6 +318,29 @@ app.get('/art/:id', (req, res) => {
   const title = row.title || 'Untitled';
   const created = new Date(row.created_at + 'Z').toLocaleDateString();
   
+  // Get original if remix
+  let originalInfo = null;
+  if (row.remix_of) {
+    const orig = db.prepare('SELECT id, author, title FROM art WHERE id = ?').get(row.remix_of);
+    if (orig) originalInfo = orig;
+  }
+  
+  // Get remixes of this piece
+  const remixes = db.prepare('SELECT id, author, title FROM art WHERE remix_of = ? ORDER BY created_at DESC LIMIT 10').all(row.id);
+  
+  const remixHtml = originalInfo ? `
+    <div class="remix-info">
+      🔀 Remix of <a href="/art/${originalInfo.id}">${originalInfo.title || 'Untitled'}</a> by ${originalInfo.author}
+    </div>
+  ` : '';
+  
+  const remixesHtml = remixes.length > 0 ? `
+    <div class="remixes">
+      <h3>Remixes (${remixes.length})</h3>
+      ${remixes.map(r => `<a href="/art/${r.id}">${r.title || 'Untitled'} by ${r.author}</a>`).join('')}
+    </div>
+  ` : '';
+  
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -294,6 +387,14 @@ app.get('/art/:id', (req, res) => {
     .meta .author { color: #ff6b6b; }
     .meta .title { color: #fff; font-weight: bold; }
     .stats { margin-top: 1rem; font-size: 0.8rem; color: #666; }
+    .remix-info {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #1a1a2e;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .remix-info a { color: #4ecdc4; }
     .palette {
       display: flex;
       gap: 0.5rem;
@@ -306,7 +407,7 @@ app.get('/art/:id', (req, res) => {
       border-radius: 4px;
       border: 1px solid #333;
     }
-    .actions { margin-top: 1.5rem; display: flex; gap: 1rem; }
+    .actions { margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap; }
     .actions a {
       padding: 0.5rem 1rem;
       background: #16161e;
@@ -317,6 +418,32 @@ app.get('/art/:id', (req, res) => {
       font-size: 0.85rem;
     }
     .actions a:hover { background: #1a1a2e; }
+    .actions a.remix-btn {
+      background: #4ecdc4;
+      color: #0a0a0f;
+      border-color: #4ecdc4;
+      font-weight: bold;
+    }
+    .actions a.remix-btn:hover { background: #45b7aa; }
+    .remixes {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #16161e;
+      border-radius: 8px;
+    }
+    .remixes h3 {
+      font-size: 0.9rem;
+      color: #888;
+      margin-bottom: 0.75rem;
+    }
+    .remixes a {
+      display: block;
+      padding: 0.5rem;
+      color: #4ecdc4;
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+    .remixes a:hover { background: #1a1a2e; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -339,14 +466,19 @@ app.get('/art/:id', (req, res) => {
         ${row.size}×${row.size} · ${row.views + 1} views · ${created}
       </div>
       
+      ${remixHtml}
+      
       <div class="palette" id="palette"></div>
     </div>
     
     <div class="actions">
+      <a href="/remix/${row.id}" class="remix-btn">🔀 Remix</a>
       <a href="/art/${row.id}/image" target="_blank">View SVG</a>
       <a href="/api/art/${row.id}">View JSON</a>
       <a href="/api/art/${row.id}/ascii">View ASCII</a>
     </div>
+    
+    ${remixesHtml}
   </div>
   
   <script>
@@ -386,8 +518,18 @@ app.get('/draw', (req, res) => {
   res.sendFile(join(__dirname, 'public', 'draw.html'));
 });
 
+// Remix page
+app.get('/remix/:id', (req, res) => {
+  // Verify art exists
+  const row = db.prepare('SELECT id FROM art WHERE id = ?').get(req.params.id);
+  if (!row) {
+    return res.status(404).send('Art not found');
+  }
+  res.sendFile(join(__dirname, 'public', 'remix.html'));
+});
+
 // Start server
-app.listen(PORT, () => {
-  console.log(`🎨 Badugi.ai running at http://localhost:${PORT}`);
-  console.log(`📡 API: http://localhost:${PORT}/api/art`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🎨 Badugi.ai running at http://0.0.0.0:${PORT}`);
+  console.log(`📡 API: http://0.0.0.0:${PORT}/api/art`);
 });
