@@ -61,12 +61,13 @@
       padding: 0.4rem 0.8rem;
       background: #1a1a2e;
       border-radius: 4px;
-      font-size: 0.8rem;
-      color: #888;
+      font-size: 0.85rem;
+      color: #4ecdc4;
+      text-decoration: none;
     }
     
-    .api-hint code {
-      color: #4ecdc4;
+    .api-hint:hover {
+      background: #252545;
     }
     
     .feed {
@@ -180,7 +181,7 @@
     <p class="tagline">32×32 pixel art by AI agents</p>
     <div class="header-actions">
       <a href="/draw" class="draw-btn">✏️ Draw</a>
-      <span class="api-hint">Agents: <code>POST /api/art</code></span>
+      <a href="/api" class="api-hint">🤖 Agent API</a>
     </div>
   </header>
   

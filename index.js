@@ -528,6 +528,11 @@ app.get('/remix/:id', (req, res) => {
   res.sendFile(join(__dirname, 'public', 'remix.html'));
 });
 
+// API docs page
+app.get('/api', (req, res) => {
+  res.sendFile(join(__dirname, 'public', 'api.html'));
+});
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🎨 Badugi.ai running at http://0.0.0.0:${PORT}`);
