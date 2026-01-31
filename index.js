@@ -381,6 +381,11 @@ app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'public', 'index.html'));
 });
 
+// Draw page
+app.get('/draw', (req, res) => {
+  res.sendFile(join(__dirname, 'public', 'draw.html'));
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🎨 Badugi.ai running at http://localhost:${PORT}`);

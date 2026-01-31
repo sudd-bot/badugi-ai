@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Draw — Badugi.ai</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Monaco', 'Menlo', monospace;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 1rem;
+      user-select: none;
+    }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #333;
+    }
+    
+    .logo {
+      font-size: 1.25rem;
+      color: #ff6b6b;
+      text-decoration: none;
+    }
+    .logo span { color: #4ecdc4; }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .editor {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    @media (min-width: 700px) {
+      .editor {
+        flex-direction: row;
+      }
+    }
+    
+    .canvas-area {
+      flex: 1;
+    }
+    
+    .canvas {
+      display: grid;
+      grid-template-columns: repeat(32, 1fr);
+      gap: 0;
+      width: 100%;
+      max-width: 512px;
+      aspect-ratio: 1;
+      background: #16161e;
+      border-radius: 4px;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    
+    .pixel {
+      aspect-ratio: 1;
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+    
+    .pixel:hover {
+      opacity: 0.8;
+    }
+    
+    .sidebar {
+      width: 200px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .panel {
+      background: #16161e;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    
+    .panel h3 {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+    }
+    
+    .tools {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .tool {
+      flex: 1;
+      padding: 0.75rem;
+      background: #0a0a0f;
+      border: 2px solid #333;
+      border-radius: 6px;
+      color: #e0e0e0;
+      cursor: pointer;
+      font-size: 1.25rem;
+      text-align: center;
+    }
+    
+    .tool.active {
+      border-color: #4ecdc4;
+      background: #1a2a2a;
+    }
+    
+    .tool:hover {
+      border-color: #555;
+    }
+    
+    .color-current {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .color-preview {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      border: 2px solid #333;
+    }
+    
+    .color-input {
+      flex: 1;
+      padding: 0.5rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 4px;
+    }
+    
+    .palette-color {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    
+    .palette-color:hover {
+      transform: scale(1.1);
+    }
+    
+    .palette-color.active {
+      border-color: #fff;
+    }
+    
+    .publish-section input {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: inherit;
+    }
+    
+    .publish-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: #4ecdc4;
+      border: none;
+      border-radius: 6px;
+      color: #0a0a0f;
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    
+    .publish-btn:hover {
+      background: #45b7aa;
+    }
+    
+    .publish-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    
+    .actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .action-btn {
+      flex: 1;
+      padding: 0.5rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #888;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.75rem;
+    }
+    
+    .action-btn:hover {
+      color: #e0e0e0;
+      border-color: #555;
+    }
+    
+    .message {
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+    
+    .message.success {
+      background: #1a3a2a;
+      color: #4ecdc4;
+    }
+    
+    .message.error {
+      background: #3a1a1a;
+      color: #ff6b6b;
+    }
+    
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <a href="/" class="logo">🎨 Badugi<span>.ai</span></a>
+    </header>
+    
+    <div class="editor">
+      <div class="canvas-area">
+        <div class="canvas" id="canvas"></div>
+      </div>
+      
+      <div class="sidebar">
+        <div class="panel">
+          <h3>Tools</h3>
+          <div class="tools">
+            <button class="tool active" id="tool-pencil" title="Pencil">✏️</button>
+            <button class="tool" id="tool-eraser" title="Eraser">🧹</button>
+            <button class="tool" id="tool-fill" title="Fill">🪣</button>
+          </div>
+        </div>
+        
+        <div class="panel">
+          <h3>Color</h3>
+          <div class="color-current">
+            <div class="color-preview" id="color-preview"></div>
+            <input type="text" class="color-input" id="color-input" value="#ff6b6b" maxlength="7">
+          </div>
+          <div class="palette" id="palette"></div>
+        </div>
+        
+        <div class="panel">
+          <h3>Canvas</h3>
+          <div class="actions">
+            <button class="action-btn" id="btn-clear">Clear</button>
+            <button class="action-btn" id="btn-undo">Undo</button>
+          </div>
+        </div>
+        
+        <div class="panel publish-section">
+          <h3>Publish</h3>
+          <input type="text" id="author" placeholder="Your name" maxlength="64">
+          <input type="text" id="title" placeholder="Title (optional)" maxlength="128">
+          <button class="publish-btn" id="btn-publish">Publish 🎨</button>
+          <div class="message hidden" id="message"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    const SIZE = 32;
+    const BG_COLOR = '#0a0a0f';
+    
+    // Default palette
+    const defaultPalette = [
+      '#0a0a0f', '#1a1a2e', '#16213e', '#0f3460',
+      '#e94560', '#ff6b6b', '#ffa502', '#ffda79',
+      '#7bed9f', '#2ed573', '#1e90ff', '#70a1ff',
+      '#5352ed', '#a29bfe', '#ff4757', '#ff6348',
+      '#ffffff', '#f1f2f6', '#ced6e0', '#a4b0be'
+    ];
+    
+    let currentColor = '#ff6b6b';
+    let currentTool = 'pencil';
+    let isDrawing = false;
+    let pixels = [];
+    let history = [];
+    
+    // Initialize canvas
+    function initCanvas() {
+      const canvas = document.getElementById('canvas');
+      canvas.innerHTML = '';
+      pixels = [];
+      
+      for (let y = 0; y < SIZE; y++) {
+        const row = [];
+        for (let x = 0; x < SIZE; x++) {
+          const pixel = document.createElement('div');
+          pixel.className = 'pixel';
+          pixel.style.backgroundColor = BG_COLOR;
+          pixel.dataset.x = x;
+          pixel.dataset.y = y;
+          canvas.appendChild(pixel);
+          row.push(BG_COLOR);
+        }
+        pixels.push(row);
+      }
+      
+      saveHistory();
+    }
+    
+    // Initialize palette
+    function initPalette() {
+      const palette = document.getElementById('palette');
+      palette.innerHTML = '';
+      
+      defaultPalette.forEach(color => {
+        const swatch = document.createElement('div');
+        swatch.className = 'palette-color';
+        swatch.style.backgroundColor = color;
+        swatch.dataset.color = color;
+        if (color === currentColor) swatch.classList.add('active');
+        palette.appendChild(swatch);
+      });
+    }
+    
+    function setColor(color) {
+      currentColor = color;
+      document.getElementById('color-preview').style.backgroundColor = color;
+      document.getElementById('color-input').value = color;
+      
+      document.querySelectorAll('.palette-color').forEach(el => {
+        el.classList.toggle('active', el.dataset.color === color);
+      });
+    }
+    
+    function setTool(tool) {
+      currentTool = tool;
+      document.querySelectorAll('.tool').forEach(el => el.classList.remove('active'));
+      document.getElementById('tool-' + tool).classList.add('active');
+    }
+    
+    function getPixelAt(x, y) {
+      return document.querySelector(`.pixel[data-x="${x}"][data-y="${y}"]`);
+    }
+    
+    function setPixelColor(x, y, color) {
+      const pixel = getPixelAt(x, y);
+      if (pixel) {
+        pixel.style.backgroundColor = color;
+        pixels[y][x] = color;
+      }
+    }
+    
+    function draw(e) {
+      const pixel = e.target;
+      if (!pixel.classList.contains('pixel')) return;
+      
+      const x = parseInt(pixel.dataset.x);
+      const y = parseInt(pixel.dataset.y);
+      
+      if (currentTool === 'pencil') {
+        setPixelColor(x, y, currentColor);
+      } else if (currentTool === 'eraser') {
+        setPixelColor(x, y, BG_COLOR);
+      } else if (currentTool === 'fill') {
+        floodFill(x, y, pixels[y][x], currentColor);
+      }
+    }
+    
+    function floodFill(x, y, targetColor, fillColor) {
+      if (targetColor === fillColor) return;
+      if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) return;
+      if (pixels[y][x] !== targetColor) return;
+      
+      const stack = [[x, y]];
+      const visited = new Set();
+      
+      while (stack.length > 0) {
+        const [cx, cy] = stack.pop();
+        const key = `${cx},${cy}`;
+        
+        if (visited.has(key)) continue;
+        if (cx < 0 || cx >= SIZE || cy < 0 || cy >= SIZE) continue;
+        if (pixels[cy][cx] !== targetColor) continue;
+        
+        visited.add(key);
+        setPixelColor(cx, cy, fillColor);
+        
+        stack.push([cx + 1, cy]);
+        stack.push([cx - 1, cy]);
+        stack.push([cx, cy + 1]);
+        stack.push([cx, cy - 1]);
+      }
+    }
+    
+    function saveHistory() {
+      history.push(pixels.map(row => [...row]));
+      if (history.length > 50) history.shift();
+    }
+    
+    function undo() {
+      if (history.length <= 1) return;
+      history.pop();
+      const prev = history[history.length - 1];
+      
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          setPixelColor(x, y, prev[y][x]);
+        }
+      }
+    }
+    
+    function clear() {
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          setPixelColor(x, y, BG_COLOR);
+        }
+      }
+      saveHistory();
+    }
+    
+    async function publish() {
+      const author = document.getElementById('author').value.trim();
+      const title = document.getElementById('title').value.trim();
+      const msg = document.getElementById('message');
+      
+      if (!author) {
+        msg.className = 'message error';
+        msg.textContent = 'Enter your name';
+        msg.classList.remove('hidden');
+        return;
+      }
+      
+      // Build palette from used colors
+      const usedColors = new Set();
+      pixels.forEach(row => row.forEach(c => usedColors.add(c)));
+      const palette = [...usedColors];
+      const colorIndex = {};
+      palette.forEach((c, i) => colorIndex[c] = i);
+      
+      const indexedPixels = pixels.map(row => row.map(c => colorIndex[c]));
+      
+      try {
+        const res = await fetch('/api/art', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            author,
+            title: title || undefined,
+            size: SIZE,
+            palette,
+            pixels: indexedPixels
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          msg.className = 'message success';
+          msg.innerHTML = `Published! <a href="${data.url}" style="color: inherit;">View it →</a>`;
+          msg.classList.remove('hidden');
+        } else {
+          msg.className = 'message error';
+          msg.textContent = data.error;
+          msg.classList.remove('hidden');
+        }
+      } catch (err) {
+        msg.className = 'message error';
+        msg.textContent = 'Network error';
+        msg.classList.remove('hidden');
+      }
+    }
+    
+    // Event listeners
+    const canvas = document.getElementById('canvas');
+    
+    canvas.addEventListener('mousedown', (e) => {
+      isDrawing = true;
+      draw(e);
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+      if (isDrawing && currentTool !== 'fill') draw(e);
+    });
+    
+    canvas.addEventListener('mouseup', () => {
+      if (isDrawing) saveHistory();
+      isDrawing = false;
+    });
+    
+    canvas.addEventListener('mouseleave', () => {
+      if (isDrawing) saveHistory();
+      isDrawing = false;
+    });
+    
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      isDrawing = true;
+      const touch = e.touches[0];
+      const pixel = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (pixel) draw({ target: pixel });
+    });
+    
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!isDrawing || currentTool === 'fill') return;
+      const touch = e.touches[0];
+      const pixel = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (pixel) draw({ target: pixel });
+    });
+    
+    canvas.addEventListener('touchend', () => {
+      if (isDrawing) saveHistory();
+      isDrawing = false;
+    });
+    
+    // Tool buttons
+    document.getElementById('tool-pencil').onclick = () => setTool('pencil');
+    document.getElementById('tool-eraser').onclick = () => setTool('eraser');
+    document.getElementById('tool-fill').onclick = () => setTool('fill');
+    
+    // Palette clicks
+    document.getElementById('palette').addEventListener('click', (e) => {
+      if (e.target.classList.contains('palette-color')) {
+        setColor(e.target.dataset.color);
+      }
+    });
+    
+    // Color input
+    document.getElementById('color-input').addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+        setColor(val);
+      }
+    });
+    
+    // Action buttons
+    document.getElementById('btn-clear').onclick = clear;
+    document.getElementById('btn-undo').onclick = undo;
+    document.getElementById('btn-publish').onclick = publish;
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'p') setTool('pencil');
+      if (e.key === 'e') setTool('eraser');
+      if (e.key === 'f') setTool('fill');
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        undo();
+      }
+    });
+    
+    // Init
+    initCanvas();
+    initPalette();
+    setColor(currentColor);
+  </script>
+</body>
+</html>
