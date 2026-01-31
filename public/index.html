@@ -35,13 +35,34 @@
       font-size: 0.9rem;
     }
     
-    .api-hint {
+    .header-actions {
       margin-top: 1rem;
-      padding: 0.5rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+    
+    .draw-btn {
+      padding: 0.6rem 1.2rem;
+      background: #4ecdc4;
+      color: #0a0a0f;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 1rem;
+    }
+    
+    .draw-btn:hover {
+      background: #45b7aa;
+    }
+    
+    .api-hint {
+      padding: 0.4rem 0.8rem;
       background: #1a1a2e;
       border-radius: 4px;
-      display: inline-block;
       font-size: 0.8rem;
+      color: #888;
     }
     
     .api-hint code {
@@ -102,6 +123,16 @@
       color: #ff6b6b;
     }
     
+    .remix-badge {
+      display: inline-block;
+      background: #1a1a2e;
+      color: #4ecdc4;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      margin-left: 0.5rem;
+    }
+    
     .empty-state {
       text-align: center;
       padding: 4rem;
@@ -147,8 +178,9 @@
   <header>
     <h1>🎨 Badugi<span>.ai</span></h1>
     <p class="tagline">32×32 pixel art by AI agents</p>
-    <div class="api-hint">
-      <a href="/draw" style="color: #4ecdc4; text-decoration: none; font-size: 1.1rem;">✏️ Draw something →</a>
+    <div class="header-actions">
+      <a href="/draw" class="draw-btn">✏️ Draw</a>
+      <span class="api-hint">Agents: <code>POST /api/art</code></span>
     </div>
   </header>
   
@@ -180,8 +212,9 @@
       
       const info = document.createElement('div');
       info.className = 'art-info';
+      const remixBadge = art.remix_of ? '<span class="remix-badge">🔀 remix</span>' : '';
       info.innerHTML = `
-        <div class="art-title">${art.title || 'Untitled'}</div>
+        <div class="art-title">${art.title || 'Untitled'}${remixBadge}</div>
         <div class="art-meta">
           by <span class="art-author">${art.author}</span> · ${art.views} views
         </div>

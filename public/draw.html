@@ -278,6 +278,9 @@
             <button class="action-btn" id="btn-clear">Clear</button>
             <button class="action-btn" id="btn-undo">Undo</button>
           </div>
+          <div class="actions" style="margin-top: 0.5rem;">
+            <button class="action-btn" id="btn-random-palette">🎲 Random Palette</button>
+          </div>
         </div>
         
         <div class="panel publish-section">
@@ -560,10 +563,86 @@
       }
     });
     
+    function randomPalette() {
+      // Generate a harmonious random palette
+      const palettes = [
+        // Warm sunset
+        () => {
+          const base = Math.random() * 30;
+          return Array.from({length: 8}, (_, i) => 
+            `hsl(${base + i * 8}, ${60 + Math.random() * 30}%, ${20 + i * 10}%)`
+          );
+        },
+        // Cool ocean
+        () => {
+          const base = 180 + Math.random() * 60;
+          return Array.from({length: 8}, (_, i) => 
+            `hsl(${base + i * 5}, ${50 + Math.random() * 40}%, ${15 + i * 10}%)`
+          );
+        },
+        // Forest
+        () => {
+          const base = 80 + Math.random() * 60;
+          return Array.from({length: 8}, (_, i) => 
+            `hsl(${base + i * 10}, ${40 + Math.random() * 30}%, ${10 + i * 10}%)`
+          );
+        },
+        // Neon
+        () => {
+          return Array.from({length: 8}, () => 
+            `hsl(${Math.random() * 360}, ${80 + Math.random() * 20}%, ${50 + Math.random() * 20}%)`
+          );
+        },
+        // Monochrome
+        () => {
+          const hue = Math.random() * 360;
+          return Array.from({length: 8}, (_, i) => 
+            `hsl(${hue}, ${20 + Math.random() * 20}%, ${10 + i * 11}%)`
+          );
+        }
+      ];
+      
+      const generator = palettes[Math.floor(Math.random() * palettes.length)];
+      const hslColors = generator();
+      
+      // Convert HSL to Hex
+      const hexColors = hslColors.map(hsl => {
+        const temp = document.createElement('div');
+        temp.style.color = hsl;
+        document.body.appendChild(temp);
+        const rgb = getComputedStyle(temp).color;
+        document.body.removeChild(temp);
+        const match = rgb.match(/\d+/g);
+        if (match) {
+          return '#' + match.slice(0, 3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+        }
+        return '#888888';
+      });
+      
+      // Add black and white
+      const finalPalette = ['#0a0a0f', '#ffffff', ...hexColors];
+      
+      // Update the palette display
+      const paletteEl = document.getElementById('palette');
+      paletteEl.innerHTML = '';
+      finalPalette.forEach(color => {
+        const swatch = document.createElement('div');
+        swatch.className = 'palette-color';
+        swatch.style.backgroundColor = color;
+        swatch.dataset.color = color;
+        if (color === currentColor) swatch.classList.add('active');
+        paletteEl.appendChild(swatch);
+      });
+      
+      // Select first non-black color
+      setColor(finalPalette[2]);
+    }
+    
     // Action buttons
     document.getElementById('btn-clear').onclick = clear;
     document.getElementById('btn-undo').onclick = undo;
     document.getElementById('btn-publish').onclick = publish;
+    document.getElementById('btn-random-palette').onclick = randomPalette;
     
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
