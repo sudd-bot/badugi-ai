@@ -186,11 +186,11 @@ app.post('/api/art', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid title (string, max 128 chars)' });
     }
     
-    // Validate size (16x16 only)
-    if (size !== 16) {
+    // Validate size (32x32 only)
+    if (size !== 32) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Size must be 16 (16x16 pixels)' 
+        error: 'Size must be 32 (32x32 pixels)' 
       });
     }
     
