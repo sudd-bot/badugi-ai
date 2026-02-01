@@ -336,6 +336,70 @@
       border-radius: 6px;
       margin-bottom: 0.5rem;
     }
+    
+    /* Feed Section */
+    .feed-section {
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 1px solid #333;
+    }
+    
+    .feed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    
+    .feed-header h2 {
+      font-size: 1.1rem;
+      color: #888;
+    }
+    
+    .feed-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 1rem;
+    }
+    
+    .feed-card {
+      background: #16161e;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    
+    .feed-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    
+    .feed-thumb {
+      display: grid;
+      grid-template-columns: repeat(32, 1fr);
+      aspect-ratio: 1;
+    }
+    
+    .feed-pixel {
+      aspect-ratio: 1;
+    }
+    
+    .feed-meta {
+      padding: 0.5rem;
+      font-size: 0.7rem;
+      color: #888;
+    }
+    
+    .feed-meta .author {
+      color: #4ecdc4;
+    }
+    
+    .feed-empty {
+      text-align: center;
+      padding: 2rem;
+      color: #555;
+    }
   </style>
 </head>
 <body>
@@ -393,6 +457,16 @@
     </div>
   </div>
   
+  <!-- Feed Section -->
+  <div class="feed-section hidden" id="feed-section">
+    <div class="feed-header">
+      <h2>📜 Feed</h2>
+    </div>
+    <div class="feed-grid" id="feed-grid">
+      <div class="feed-empty">No art yet — be the first!</div>
+    </div>
+  </div>
+  
   <canvas id="work-canvas" width="32" height="32" style="display:none;"></canvas>
   
   <script>
@@ -434,10 +508,14 @@
       const name = nameInput.value.trim() || 'Anonymous';
       localStorage.setItem('pixelName', name);
       
-      // Hide modal, show room
+      // Hide modal, show room + feed
       document.getElementById('join-modal').classList.add('hidden');
       document.getElementById('header').classList.remove('hidden');
       document.getElementById('main-content').classList.remove('hidden');
+      document.getElementById('feed-section').classList.remove('hidden');
+      
+      // Load feed
+      loadFeed();
       
       // Connect with the name
       connect(name);
@@ -634,7 +712,7 @@
       }
     }
     
-    // Publish current pixels
+    // Publish current pixels (to room + save to feed)
     async function publish() {
       if (!room) return;
       
@@ -648,9 +726,101 @@
         participants.set(room.localParticipant.identity, data);
         updateGrid();
         
-        console.log('Published!');
+        // Extract palette from pixels and save to feed
+        const palette = [...new Set(localPixels.flat())];
+        const paletteMap = {};
+        palette.forEach((c, i) => paletteMap[c] = i);
+        const indexedPixels = localPixels.map(row => row.map(c => paletteMap[c]));
+        
+        const participantName = localStorage.getItem('pixelName') || 'Anonymous';
+        
+        await fetch('/api/art', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            author: participantName,
+            size: SIZE,
+            palette: palette,
+            pixels: indexedPixels
+          })
+        });
+        
+        // Refresh feed
+        loadFeed();
+        
+        console.log('Published to room + feed!');
       } catch (err) {
         console.error('Publish error:', err);
+      }
+    }
+    
+    // Load feed from API
+    async function loadFeed() {
+      try {
+        const res = await fetch('/api/art?limit=24');
+        const data = await res.json();
+        renderFeed(data.art || []);
+      } catch (err) {
+        console.error('Feed load error:', err);
+      }
+    }
+    
+    // Render feed grid
+    function renderFeed(artworks) {
+      const grid = document.getElementById('feed-grid');
+      
+      if (!artworks.length) {
+        grid.innerHTML = '<div class="feed-empty">No art yet — be the first!</div>';
+        return;
+      }
+      
+      grid.innerHTML = artworks.map(art => {
+        const pixels = art.pixels;
+        const palette = art.palette;
+        
+        let thumbHtml = '';
+        for (let y = 0; y < art.size; y++) {
+          for (let x = 0; x < art.size; x++) {
+            const color = palette[pixels[y][x]] || '#0a0a0f';
+            thumbHtml += `<div class="feed-pixel" style="background:${color}"></div>`;
+          }
+        }
+        
+        return `
+          <div class="feed-card" data-id="${art.id}" onclick="remixArt('${art.id}')">
+            <div class="feed-thumb" style="grid-template-columns:repeat(${art.size},1fr)">${thumbHtml}</div>
+            <div class="feed-meta">
+              <span class="author">${art.author}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    // Remix: load art into editor
+    async function remixArt(id) {
+      try {
+        const res = await fetch(`/api/art/${id}`);
+        const art = await res.json();
+        
+        if (!art.pixels || !art.palette) return;
+        
+        // Load into editor
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            const colorIdx = art.pixels[y]?.[x] ?? 0;
+            const color = art.palette[colorIdx] || BG_COLOR;
+            setPixelColor(x, y, color);
+          }
+        }
+        
+        // Update palette display with art's palette
+        updatePaletteDisplay(art.palette);
+        if (art.palette.length > 0) setColor(art.palette[0]);
+        
+        console.log('Loaded remix:', id);
+      } catch (err) {
+        console.error('Remix error:', err);
       }
     }
     
