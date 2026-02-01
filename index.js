@@ -4,6 +4,8 @@ import pg from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import crypto from 'crypto';
+import { AccessToken } from 'livekit-server-sdk';
 
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
@@ -540,6 +542,58 @@ app.get('/', (req, res) => res.sendFile(join(__dirname, 'public', 'index.html'))
 app.get('/draw', (req, res) => res.sendFile(join(__dirname, 'public', 'draw.html')));
 app.get('/camera', (req, res) => res.sendFile(join(__dirname, 'public', 'camera.html')));
 app.get('/api', (req, res) => res.sendFile(join(__dirname, 'public', 'api.html')));
+
+// LiveKit config
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
+const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://localhost:7880';
+
+// LiveKit token endpoint
+app.post('/api/token', async (req, res) => {
+  if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+    return res.status(503).json({ error: 'LiveKit not configured' });
+  }
+  
+  try {
+    const { roomName, participantName } = req.body;
+    
+    if (!roomName) {
+      return res.status(400).json({ error: 'roomName required' });
+    }
+    
+    const name = participantName || 'user_' + crypto.randomBytes(4).toString('hex');
+    
+    const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+      identity: name,
+      name: name,
+    });
+    
+    token.addGrant({
+      room: roomName,
+      roomJoin: true,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+      canUpdateOwnMetadata: true,
+    });
+    
+    const jwt = await token.toJwt();
+    
+    res.json({
+      token: jwt,
+      identity: name,
+      roomName,
+      livekitUrl: LIVEKIT_URL,
+    });
+  } catch (err) {
+    console.error('Token error:', err);
+    res.status(500).json({ error: 'Failed to generate token' });
+  }
+});
+
+// Room pages
+app.get('/room', (req, res) => res.sendFile(join(__dirname, 'public', 'room.html')));
+app.get('/room/:id', (req, res) => res.sendFile(join(__dirname, 'public', 'room.html')));
 
 app.get('/remix/:id', async (req, res) => {
   try {

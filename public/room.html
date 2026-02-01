@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Room — LiveKit Pixels</title>
+  <script src="https://unpkg.com/livekit-client@2.6.2/dist/livekit-client.umd.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Monaco', 'Menlo', monospace;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #333;
+      margin-bottom: 1rem;
+    }
+    
+    .logo {
+      font-size: 1.25rem;
+      color: #ff6b6b;
+      text-decoration: none;
+    }
+    .logo span { color: #4ecdc4; }
+    
+    .room-info {
+      font-size: 0.85rem;
+      color: #888;
+    }
+    .room-info strong { color: #4ecdc4; }
+    
+    .main {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .grid-section {
+      flex: 1;
+      min-width: 320px;
+    }
+    
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 480px;
+      background: #16161e;
+      padding: 12px;
+      border-radius: 12px;
+    }
+    
+    .grid-cell {
+      aspect-ratio: 1;
+      background: #0a0a0f;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .grid-cell.empty {
+      border: 2px dashed #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #444;
+      font-size: 0.75rem;
+    }
+    
+    .grid-cell.self {
+      border: 2px solid #4ecdc4;
+    }
+    
+    .cell-canvas {
+      display: grid;
+      grid-template-columns: repeat(16, 1fr);
+      width: 100%;
+      height: 100%;
+    }
+    
+    .cell-pixel {
+      aspect-ratio: 1;
+    }
+    
+    .cell-name {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.7);
+      padding: 2px 4px;
+      font-size: 0.65rem;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .editor-section {
+      flex: 1;
+      min-width: 320px;
+      max-width: 400px;
+    }
+    
+    .panel {
+      background: #16161e;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .panel h3 {
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+    }
+    
+    .editor-canvas {
+      display: grid;
+      grid-template-columns: repeat(16, 1fr);
+      gap: 1px;
+      width: 100%;
+      aspect-ratio: 1;
+      background: #0a0a0f;
+      border-radius: 6px;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    
+    .editor-pixel {
+      aspect-ratio: 1;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    .editor-pixel:hover {
+      opacity: 0.8;
+    }
+    
+    .tools {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .tool {
+      flex: 1;
+      padding: 0.75rem;
+      background: #0a0a0f;
+      border: 2px solid #333;
+      border-radius: 6px;
+      color: #e0e0e0;
+      cursor: pointer;
+      font-size: 1.1rem;
+      text-align: center;
+    }
+    
+    .tool.active {
+      border-color: #4ecdc4;
+      background: #1a2a2a;
+    }
+    
+    .color-current {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .color-preview {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      border: 2px solid #333;
+    }
+    
+    .color-input {
+      flex: 1;
+      padding: 0.5rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: inherit;
+    }
+    
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+    }
+    
+    .palette-color {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+    }
+    
+    .palette-color:hover { transform: scale(1.1); }
+    .palette-color.active { border-color: #fff; }
+    
+    .publish-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: #4ecdc4;
+      border: none;
+      border-radius: 6px;
+      color: #0a0a0f;
+      font-family: inherit;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    
+    .publish-btn:hover { background: #45b7aa; }
+    
+    .camera-section {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid #333;
+    }
+    
+    .camera-btn {
+      width: 100%;
+      padding: 0.6rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #888;
+      font-family: inherit;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    
+    .camera-btn:hover { color: #e0e0e0; border-color: #555; }
+    .camera-btn.active { background: #4ecdc4; color: #0a0a0f; border-color: #4ecdc4; }
+    
+    .status {
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    
+    .status.connecting { background: #1a1a2e; color: #888; }
+    .status.connected { background: #1a3a2a; color: #4ecdc4; }
+    .status.error { background: #3a1a1a; color: #ff6b6b; }
+    
+    .hidden { display: none !important; }
+    
+    video {
+      width: 100%;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/" class="logo">🎨 LiveKit <span>Pixels</span></a>
+    <div class="room-info">
+      Room: <strong id="room-name">...</strong> • 
+      <span id="participant-count">0</span>/9 participants
+    </div>
+  </header>
+  
+  <div class="main">
+    <div class="grid-section">
+      <div class="status connecting" id="status">Connecting...</div>
+      <div class="grid-container" id="grid">
+        <!-- 9 cells will be populated -->
+      </div>
+    </div>
+    
+    <div class="editor-section">
+      <div class="panel">
+        <h3>Your Canvas</h3>
+        <div class="tools">
+          <button class="tool active" id="tool-pencil" title="Pencil">✏️</button>
+          <button class="tool" id="tool-eraser" title="Eraser">🧹</button>
+          <button class="tool" id="tool-fill" title="Fill">🪣</button>
+        </div>
+        <div class="editor-canvas" id="editor"></div>
+        <button class="publish-btn" id="publish-btn">📡 Publish</button>
+        
+        <div class="camera-section">
+          <button class="camera-btn" id="camera-btn">📷 Camera Mode</button>
+        </div>
+        <video id="video" autoplay playsinline muted style="display:none;"></video>
+      </div>
+      
+      <div class="panel">
+        <h3>Color</h3>
+        <div class="color-current">
+          <div class="color-preview" id="color-preview"></div>
+          <input type="text" class="color-input" id="color-input" value="#ff6b6b" maxlength="7">
+        </div>
+        <div class="palette" id="palette"></div>
+      </div>
+    </div>
+  </div>
+  
+  <canvas id="work-canvas" width="16" height="16" style="display:none;"></canvas>
+  
+  <script>
+    const SIZE = 16;
+    const MAX_PARTICIPANTS = 9;
+    const BG_COLOR = '#0a0a0f';
+    
+    const defaultPalette = [
+      '#0a0a0f', '#1a1a2e', '#16213e', '#0f3460',
+      '#e94560', '#ff6b6b', '#ffa502', '#ffda79',
+      '#7bed9f', '#2ed573', '#1e90ff', '#70a1ff',
+      '#5352ed', '#a29bfe', '#ff4757', '#ffffff'
+    ];
+    
+    // State
+    let room = null;
+    let localPixels = [];
+    let currentColor = '#ff6b6b';
+    let currentTool = 'pencil';
+    let isDrawing = false;
+    let cameraStream = null;
+    let participants = new Map(); // identity -> { name, pixels }
+    
+    // Get room name from URL
+    const pathParts = window.location.pathname.split('/');
+    const roomName = pathParts[pathParts.length - 1] || 'default';
+    document.getElementById('room-name').textContent = roomName;
+    
+    // Initialize editor canvas
+    function initEditor() {
+      const editor = document.getElementById('editor');
+      editor.innerHTML = '';
+      localPixels = [];
+      
+      for (let y = 0; y < SIZE; y++) {
+        const row = [];
+        for (let x = 0; x < SIZE; x++) {
+          const pixel = document.createElement('div');
+          pixel.className = 'editor-pixel';
+          pixel.style.backgroundColor = BG_COLOR;
+          pixel.dataset.x = x;
+          pixel.dataset.y = y;
+          editor.appendChild(pixel);
+          row.push(BG_COLOR);
+        }
+        localPixels.push(row);
+      }
+    }
+    
+    // Initialize palette
+    function initPalette() {
+      const palette = document.getElementById('palette');
+      palette.innerHTML = '';
+      defaultPalette.forEach(color => {
+        const swatch = document.createElement('div');
+        swatch.className = 'palette-color';
+        swatch.style.backgroundColor = color;
+        swatch.dataset.color = color;
+        if (color === currentColor) swatch.classList.add('active');
+        palette.appendChild(swatch);
+      });
+    }
+    
+    // Initialize 3x3 grid
+    function initGrid() {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      for (let i = 0; i < MAX_PARTICIPANTS; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell empty';
+        cell.id = `cell-${i}`;
+        cell.innerHTML = '<span>Empty</span>';
+        grid.appendChild(cell);
+      }
+    }
+    
+    // Render a participant's pixels into a cell
+    function renderParticipantCell(cellIndex, identity, name, pixels) {
+      const cell = document.getElementById(`cell-${cellIndex}`);
+      if (!cell) return;
+      
+      cell.className = 'grid-cell';
+      if (room && identity === room.localParticipant.identity) {
+        cell.classList.add('self');
+      }
+      
+      let html = '<div class="cell-canvas">';
+      if (pixels && pixels.length === SIZE) {
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            const color = pixels[y]?.[x] || BG_COLOR;
+            html += `<div class="cell-pixel" style="background:${color}"></div>`;
+          }
+        }
+      } else {
+        // Empty canvas
+        for (let i = 0; i < SIZE * SIZE; i++) {
+          html += `<div class="cell-pixel" style="background:${BG_COLOR}"></div>`;
+        }
+      }
+      html += '</div>';
+      html += `<div class="cell-name">${name || identity}</div>`;
+      cell.innerHTML = html;
+    }
+    
+    // Update grid display
+    function updateGrid() {
+      // Clear all cells
+      initGrid();
+      
+      // Add participants
+      let cellIndex = 0;
+      participants.forEach((data, identity) => {
+        if (cellIndex < MAX_PARTICIPANTS) {
+          renderParticipantCell(cellIndex, identity, data.name, data.pixels);
+          cellIndex++;
+        }
+      });
+      
+      document.getElementById('participant-count').textContent = participants.size;
+    }
+    
+    // Parse pixels from participant metadata
+    function parsePixelsFromMetadata(metadata) {
+      if (!metadata) return null;
+      try {
+        const data = JSON.parse(metadata);
+        return data.pixels || null;
+      } catch (e) {
+        return null;
+      }
+    }
+    
+    // Connect to LiveKit room
+    async function connect() {
+      const status = document.getElementById('status');
+      const participantName = localStorage.getItem('pixelName') || 'Anonymous';
+      
+      try {
+        // Get token from server
+        const res = await fetch('/api/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomName, participantName })
+        });
+        const { token, livekitUrl, identity } = await res.json();
+        
+        // Connect to room
+        room = new LivekitClient.Room();
+        
+        // Set up event handlers
+        room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
+          console.log('Participant connected:', participant.identity);
+          participants.set(participant.identity, {
+            name: participant.name || participant.identity,
+            pixels: parsePixelsFromMetadata(participant.metadata)
+          });
+          updateGrid();
+          
+          // Listen for their metadata updates
+          participant.on(LivekitClient.ParticipantEvent.ParticipantMetadataChanged, () => {
+            const data = participants.get(participant.identity) || {};
+            data.pixels = parsePixelsFromMetadata(participant.metadata);
+            participants.set(participant.identity, data);
+            updateGrid();
+          });
+        });
+        
+        room.on(LivekitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+          console.log('Participant disconnected:', participant.identity);
+          participants.delete(participant.identity);
+          updateGrid();
+        });
+        
+        room.on(LivekitClient.RoomEvent.Disconnected, () => {
+          status.className = 'status error';
+          status.textContent = 'Disconnected';
+        });
+        
+        // Connect
+        await room.connect(livekitUrl, token);
+        
+        status.className = 'status connected';
+        status.textContent = `Connected as ${participantName}`;
+        
+        // Add self
+        participants.set(room.localParticipant.identity, {
+          name: participantName,
+          pixels: localPixels
+        });
+        
+        // Add existing participants
+        room.remoteParticipants.forEach((participant) => {
+          participants.set(participant.identity, {
+            name: participant.name || participant.identity,
+            pixels: parsePixelsFromMetadata(participant.metadata)
+          });
+          
+          participant.on(LivekitClient.ParticipantEvent.ParticipantMetadataChanged, () => {
+            const data = participants.get(participant.identity) || {};
+            data.pixels = parsePixelsFromMetadata(participant.metadata);
+            participants.set(participant.identity, data);
+            updateGrid();
+          });
+        });
+        
+        updateGrid();
+        
+      } catch (err) {
+        console.error('Connection error:', err);
+        status.className = 'status error';
+        status.textContent = 'Connection failed: ' + err.message;
+      }
+    }
+    
+    // Publish current pixels
+    async function publish() {
+      if (!room) return;
+      
+      try {
+        const metadata = JSON.stringify({ pixels: localPixels });
+        await room.localParticipant.setMetadata(metadata);
+        
+        // Update local display
+        const data = participants.get(room.localParticipant.identity) || {};
+        data.pixels = localPixels;
+        participants.set(room.localParticipant.identity, data);
+        updateGrid();
+        
+        console.log('Published!');
+      } catch (err) {
+        console.error('Publish error:', err);
+      }
+    }
+    
+    // Drawing functions
+    function setColor(color) {
+      currentColor = color;
+      document.getElementById('color-preview').style.backgroundColor = color;
+      document.getElementById('color-input').value = color;
+      document.querySelectorAll('.palette-color').forEach(el => {
+        el.classList.toggle('active', el.dataset.color === color);
+      });
+    }
+    
+    function setTool(tool) {
+      currentTool = tool;
+      document.querySelectorAll('.tool').forEach(el => el.classList.remove('active'));
+      document.getElementById('tool-' + tool).classList.add('active');
+    }
+    
+    function getEditorPixel(x, y) {
+      return document.querySelector(`.editor-pixel[data-x="${x}"][data-y="${y}"]`);
+    }
+    
+    function setPixelColor(x, y, color) {
+      const pixel = getEditorPixel(x, y);
+      if (pixel) {
+        pixel.style.backgroundColor = color;
+        localPixels[y][x] = color;
+      }
+    }
+    
+    function floodFill(x, y, targetColor, fillColor) {
+      if (targetColor === fillColor) return;
+      if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) return;
+      if (localPixels[y][x] !== targetColor) return;
+      
+      const stack = [[x, y]];
+      const visited = new Set();
+      
+      while (stack.length > 0) {
+        const [cx, cy] = stack.pop();
+        const key = `${cx},${cy}`;
+        if (visited.has(key)) continue;
+        if (cx < 0 || cx >= SIZE || cy < 0 || cy >= SIZE) continue;
+        if (localPixels[cy][cx] !== targetColor) continue;
+        
+        visited.add(key);
+        setPixelColor(cx, cy, fillColor);
+        stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+      }
+    }
+    
+    function draw(e) {
+      const pixel = e.target;
+      if (!pixel.classList.contains('editor-pixel')) return;
+      
+      const x = parseInt(pixel.dataset.x);
+      const y = parseInt(pixel.dataset.y);
+      
+      if (currentTool === 'pencil') {
+        setPixelColor(x, y, currentColor);
+      } else if (currentTool === 'eraser') {
+        setPixelColor(x, y, BG_COLOR);
+      } else if (currentTool === 'fill') {
+        floodFill(x, y, localPixels[y][x], currentColor);
+      }
+    }
+    
+    // Camera functions
+    let cameraMode = false;
+    let cameraAnimationId = null;
+    
+    async function toggleCamera() {
+      const video = document.getElementById('video');
+      const btn = document.getElementById('camera-btn');
+      
+      if (cameraMode) {
+        // Turn off camera mode
+        cameraMode = false;
+        if (cameraAnimationId) {
+          cancelAnimationFrame(cameraAnimationId);
+          cameraAnimationId = null;
+        }
+        if (cameraStream) {
+          cameraStream.getTracks().forEach(t => t.stop());
+          cameraStream = null;
+        }
+        btn.textContent = '📷 Camera Mode';
+        btn.classList.remove('active');
+        // Pixels persist - no changes needed
+        return;
+      }
+      
+      if (!navigator.mediaDevices?.getUserMedia) {
+        alert('Camera not supported (requires HTTPS)');
+        return;
+      }
+      
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 256 }, height: { ideal: 256 } }
+        });
+        video.srcObject = cameraStream;
+        await video.play();
+        
+        cameraMode = true;
+        btn.textContent = '📷 Camera ON';
+        btn.classList.add('active');
+        
+        // Start continuous capture loop
+        captureLoop();
+      } catch (err) {
+        console.error('Camera error:', err);
+        alert('Camera error: ' + err.message);
+      }
+    }
+    
+    function captureLoop() {
+      if (!cameraMode) return;
+      
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('work-canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      
+      if (video.readyState >= 2) {
+        // Draw video to canvas (16x16)
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+        const size = Math.min(vw, vh);
+        const sx = (vw - size) / 2;
+        const sy = (vh - size) / 2;
+        ctx.drawImage(video, sx, sy, size, size, 0, 0, SIZE, SIZE);
+        
+        const imageData = ctx.getImageData(0, 0, SIZE, SIZE);
+        const data = imageData.data;
+        
+        // Extract palette from video using k-means-ish approach
+        const videoPalette = extractPalette(data, 16);
+        
+        // Update palette display
+        updatePaletteDisplay(videoPalette);
+        
+        // Map pixels to extracted palette
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            const i = (y * SIZE + x) * 4;
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            
+            // Find nearest palette color
+            let minDist = Infinity;
+            let nearest = videoPalette[0];
+            for (const hex of videoPalette) {
+              const pr = parseInt(hex.slice(1, 3), 16);
+              const pg = parseInt(hex.slice(3, 5), 16);
+              const pb = parseInt(hex.slice(5, 7), 16);
+              const dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
+              if (dist < minDist) {
+                minDist = dist;
+                nearest = hex;
+              }
+            }
+            
+            setPixelColor(x, y, nearest);
+          }
+        }
+      }
+      
+      cameraAnimationId = requestAnimationFrame(captureLoop);
+    }
+    
+    function extractPalette(data, numColors) {
+      // Collect pixel colors
+      const pixels = [];
+      for (let i = 0; i < data.length; i += 4) {
+        pixels.push([data[i], data[i + 1], data[i + 2]]);
+      }
+      
+      // Simple k-means clustering
+      let centroids = [];
+      for (let i = 0; i < numColors; i++) {
+        const idx = Math.floor(Math.random() * pixels.length);
+        centroids.push([...pixels[idx]]);
+      }
+      
+      // Run a few iterations
+      for (let iter = 0; iter < 5; iter++) {
+        const clusters = Array(numColors).fill(null).map(() => []);
+        
+        for (const pixel of pixels) {
+          let minDist = Infinity;
+          let closest = 0;
+          for (let c = 0; c < centroids.length; c++) {
+            const dist = (pixel[0] - centroids[c][0]) ** 2 +
+                         (pixel[1] - centroids[c][1]) ** 2 +
+                         (pixel[2] - centroids[c][2]) ** 2;
+            if (dist < minDist) {
+              minDist = dist;
+              closest = c;
+            }
+          }
+          clusters[closest].push(pixel);
+        }
+        
+        for (let c = 0; c < centroids.length; c++) {
+          if (clusters[c].length > 0) {
+            centroids[c] = [
+              Math.round(clusters[c].reduce((s, p) => s + p[0], 0) / clusters[c].length),
+              Math.round(clusters[c].reduce((s, p) => s + p[1], 0) / clusters[c].length),
+              Math.round(clusters[c].reduce((s, p) => s + p[2], 0) / clusters[c].length)
+            ];
+          }
+        }
+      }
+      
+      // Convert to hex and sort by brightness
+      return centroids
+        .map(c => '#' + c.map(v => v.toString(16).padStart(2, '0')).join(''))
+        .sort((a, b) => {
+          const ba = parseInt(a.slice(1, 3), 16) + parseInt(a.slice(3, 5), 16) + parseInt(a.slice(5, 7), 16);
+          const bb = parseInt(b.slice(1, 3), 16) + parseInt(b.slice(3, 5), 16) + parseInt(b.slice(5, 7), 16);
+          return ba - bb;
+        });
+    }
+    
+    function updatePaletteDisplay(palette) {
+      const paletteEl = document.getElementById('palette');
+      paletteEl.innerHTML = '';
+      palette.forEach(color => {
+        const swatch = document.createElement('div');
+        swatch.className = 'palette-color';
+        swatch.style.backgroundColor = color;
+        swatch.dataset.color = color;
+        if (color === currentColor) swatch.classList.add('active');
+        paletteEl.appendChild(swatch);
+      });
+    }
+    
+    // Event listeners
+    const editor = document.getElementById('editor');
+    editor.addEventListener('mousedown', (e) => { isDrawing = true; draw(e); });
+    editor.addEventListener('mousemove', (e) => { if (isDrawing && currentTool !== 'fill') draw(e); });
+    editor.addEventListener('mouseup', () => { isDrawing = false; });
+    editor.addEventListener('mouseleave', () => { isDrawing = false; });
+    
+    // Touch support
+    editor.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      isDrawing = true;
+      const touch = e.touches[0];
+      const pixel = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (pixel) draw({ target: pixel });
+    });
+    editor.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!isDrawing || currentTool === 'fill') return;
+      const touch = e.touches[0];
+      const pixel = document.elementFromPoint(touch.clientX, touch.clientY);
+      if (pixel) draw({ target: pixel });
+    });
+    editor.addEventListener('touchend', () => { isDrawing = false; });
+    
+    document.getElementById('tool-pencil').onclick = () => setTool('pencil');
+    document.getElementById('tool-eraser').onclick = () => setTool('eraser');
+    document.getElementById('tool-fill').onclick = () => setTool('fill');
+    
+    document.getElementById('palette').addEventListener('click', (e) => {
+      if (e.target.classList.contains('palette-color')) {
+        setColor(e.target.dataset.color);
+      }
+    });
+    
+    document.getElementById('color-input').addEventListener('input', (e) => {
+      if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+        setColor(e.target.value);
+      }
+    });
+    
+    document.getElementById('publish-btn').onclick = publish;
+    document.getElementById('camera-btn').onclick = toggleCamera;
+    
+    // Init
+    initEditor();
+    initPalette();
+    initGrid();
+    setColor(currentColor);
+    connect();
+  </script>
+</body>
+</html>
