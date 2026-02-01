@@ -436,6 +436,7 @@
           <button class="tool active" id="tool-pencil" title="Pencil">✏️</button>
           <button class="tool" id="tool-eraser" title="Eraser">🧹</button>
           <button class="tool" id="tool-fill" title="Fill">🪣</button>
+          <button class="tool" id="tool-random" title="Random">🎲</button>
         </div>
         <div class="editor-canvas" id="editor"></div>
         <button class="publish-btn" id="publish-btn">📡 Publish</button>
@@ -1101,6 +1102,153 @@
       });
     }
     
+    // Random generation
+    function generateRandom() {
+      const modes = ['symmetric', 'creature', 'gradient', 'shapes', 'plasma', 'emoji'];
+      const mode = modes[Math.floor(Math.random() * modes.length)];
+      
+      // Random vibrant palette
+      const palettes = [
+        ['#0a0a0f', '#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'],
+        ['#0a0a0f', '#f38181', '#fce38a', '#eaffd0', '#95e1d3'],
+        ['#1a1a2e', '#16213e', '#e94560', '#0f3460', '#ffffff'],
+        ['#2d132c', '#801336', '#c72c41', '#ee4540', '#f1f1f1'],
+        ['#0a0a0f', '#7400b8', '#6930c3', '#5390d9', '#4ea8de', '#48bfe3'],
+        ['#0a0a0f', '#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'],
+        ['#0a0a0f', '#264653', '#2a9d8f', '#e9c46a', '#f4a261', '#e76f51'],
+      ];
+      const palette = palettes[Math.floor(Math.random() * palettes.length)];
+      updatePaletteDisplay(palette);
+      
+      const pick = () => palette[Math.floor(Math.random() * palette.length)];
+      const pickFg = () => palette[1 + Math.floor(Math.random() * (palette.length - 1))];
+      const bg = palette[0];
+      
+      // Clear canvas
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          setPixelColor(x, y, bg);
+        }
+      }
+      
+      if (mode === 'symmetric') {
+        // Quad-symmetric pattern
+        const half = SIZE / 2;
+        for (let y = 0; y < half; y++) {
+          for (let x = 0; x < half; x++) {
+            if (Math.random() > 0.5) {
+              const c = pickFg();
+              setPixelColor(x, y, c);
+              setPixelColor(SIZE - 1 - x, y, c);
+              setPixelColor(x, SIZE - 1 - y, c);
+              setPixelColor(SIZE - 1 - x, SIZE - 1 - y, c);
+            }
+          }
+        }
+      } else if (mode === 'creature') {
+        // Symmetric creature/spaceship with vertical mirror
+        const half = SIZE / 2;
+        const bodyWidth = 4 + Math.floor(Math.random() * 8);
+        const startX = half - Math.floor(bodyWidth / 2);
+        
+        for (let y = 4; y < SIZE - 4; y++) {
+          const rowWidth = Math.floor(Math.random() * bodyWidth);
+          for (let dx = 0; dx < rowWidth; dx++) {
+            const c = pickFg();
+            setPixelColor(startX + dx, y, c);
+            setPixelColor(SIZE - 1 - startX - dx, y, c);
+          }
+        }
+        // Eyes
+        const eyeY = 8 + Math.floor(Math.random() * 4);
+        const eyeC = palette[palette.length - 1];
+        setPixelColor(half - 3, eyeY, eyeC);
+        setPixelColor(half + 2, eyeY, eyeC);
+      } else if (mode === 'gradient') {
+        // Diagonal or radial gradient
+        const isRadial = Math.random() > 0.5;
+        const center = SIZE / 2;
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            let t;
+            if (isRadial) {
+              const dist = Math.sqrt((x - center) ** 2 + (y - center) ** 2);
+              t = dist / (center * 1.4);
+            } else {
+              t = (x + y) / (SIZE * 2);
+            }
+            const idx = Math.floor(t * (palette.length - 1));
+            setPixelColor(x, y, palette[Math.min(idx, palette.length - 1)]);
+          }
+        }
+      } else if (mode === 'shapes') {
+        // Random circles and rectangles
+        const numShapes = 3 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < numShapes; i++) {
+          const c = pickFg();
+          const cx = Math.floor(Math.random() * SIZE);
+          const cy = Math.floor(Math.random() * SIZE);
+          const r = 3 + Math.floor(Math.random() * 8);
+          const isCircle = Math.random() > 0.5;
+          
+          for (let y = 0; y < SIZE; y++) {
+            for (let x = 0; x < SIZE; x++) {
+              if (isCircle) {
+                if (Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) < r) {
+                  setPixelColor(x, y, c);
+                }
+              } else {
+                if (x >= cx - r && x < cx + r && y >= cy - r && y < cy + r) {
+                  setPixelColor(x, y, c);
+                }
+              }
+            }
+          }
+        }
+      } else if (mode === 'plasma') {
+        // Plasma/noise pattern
+        const scale = 0.1 + Math.random() * 0.2;
+        const offsetX = Math.random() * 100;
+        const offsetY = Math.random() * 100;
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            const v = Math.sin((x + offsetX) * scale) + Math.sin((y + offsetY) * scale) +
+                      Math.sin((x + y + offsetX) * scale * 0.5);
+            const t = (v + 3) / 6;
+            const idx = Math.floor(t * (palette.length - 1));
+            setPixelColor(x, y, palette[Math.min(Math.max(0, idx), palette.length - 1)]);
+          }
+        }
+      } else if (mode === 'emoji') {
+        // Simple face
+        const faceColor = pickFg();
+        const eyeColor = palette[0];
+        const center = SIZE / 2;
+        const radius = 10 + Math.floor(Math.random() * 4);
+        
+        // Face circle
+        for (let y = 0; y < SIZE; y++) {
+          for (let x = 0; x < SIZE; x++) {
+            if (Math.sqrt((x - center) ** 2 + (y - center) ** 2) < radius) {
+              setPixelColor(x, y, faceColor);
+            }
+          }
+        }
+        // Eyes
+        setPixelColor(center - 4, center - 3, eyeColor);
+        setPixelColor(center - 3, center - 3, eyeColor);
+        setPixelColor(center + 3, center - 3, eyeColor);
+        setPixelColor(center + 2, center - 3, eyeColor);
+        // Mouth
+        const mouthY = center + 3;
+        for (let dx = -3; dx <= 3; dx++) {
+          setPixelColor(center + dx, mouthY, eyeColor);
+        }
+        setPixelColor(center - 4, mouthY - 1, eyeColor);
+        setPixelColor(center + 4, mouthY - 1, eyeColor);
+      }
+    }
+    
     // Event listeners
     const editor = document.getElementById('editor');
     editor.addEventListener('mousedown', (e) => { isDrawing = true; draw(e); });
@@ -1128,6 +1276,7 @@
     document.getElementById('tool-pencil').onclick = () => setTool('pencil');
     document.getElementById('tool-eraser').onclick = () => setTool('eraser');
     document.getElementById('tool-fill').onclick = () => setTool('fill');
+    document.getElementById('tool-random').onclick = generateRandom;
     
     document.getElementById('palette').addEventListener('click', (e) => {
       if (e.target.classList.contains('palette-color')) {
