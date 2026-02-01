@@ -259,6 +259,78 @@
     
     .hidden { display: none !important; }
     
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(10, 10, 15, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .modal-content {
+      background: #16161e;
+      padding: 2rem;
+      border-radius: 12px;
+      text-align: center;
+      max-width: 320px;
+      width: 90%;
+    }
+    
+    .modal-content h2 {
+      margin-bottom: 0.5rem;
+      color: #fff;
+    }
+    
+    .modal-content .room-label {
+      color: #888;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .modal-content .room-label strong {
+      color: #4ecdc4;
+    }
+    
+    .modal-content input {
+      width: 100%;
+      padding: 0.75rem;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-family: inherit;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+    
+    .modal-content input:focus {
+      outline: none;
+      border-color: #4ecdc4;
+    }
+    
+    .modal-content .join-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: #4ecdc4;
+      border: none;
+      border-radius: 6px;
+      color: #0a0a0f;
+      font-family: inherit;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    
+    .modal-content .join-btn:hover {
+      background: #45b7aa;
+    }
+    
     video {
       width: 100%;
       border-radius: 6px;
@@ -267,15 +339,25 @@
   </style>
 </head>
 <body>
-  <header>
-    <a href="/" class="logo">🎨 LiveKit <span>Pixels</span></a>
+  <!-- Join Modal -->
+  <div class="modal" id="join-modal">
+    <div class="modal-content">
+      <h2>🎨 Join Room</h2>
+      <p class="room-label">Room: <strong id="modal-room-name"></strong></p>
+      <input type="text" id="name-input" placeholder="Your name" maxlength="32" autofocus>
+      <button class="join-btn" id="join-btn">Join →</button>
+    </div>
+  </div>
+
+  <header class="hidden" id="header">
+    <a href="/" class="logo">🎨 Badugi<span>.ai</span></a>
     <div class="room-info">
       Room: <strong id="room-name">...</strong> • 
       <span id="participant-count">0</span>/9 participants
     </div>
   </header>
   
-  <div class="main">
+  <div class="main hidden" id="main-content">
     <div class="grid-section">
       <div class="status connecting" id="status">Connecting...</div>
       <div class="grid-container" id="grid">
@@ -336,8 +418,35 @@
     
     // Get room name from URL
     const pathParts = window.location.pathname.split('/');
-    const roomName = pathParts[pathParts.length - 1] || 'default';
+    const roomName = pathParts[pathParts.length - 1] || 'lobby';
     document.getElementById('room-name').textContent = roomName;
+    document.getElementById('modal-room-name').textContent = roomName;
+    
+    // Pre-fill name from localStorage
+    const savedName = localStorage.getItem('pixelName');
+    if (savedName) {
+      document.getElementById('name-input').value = savedName;
+    }
+    
+    // Join button handler
+    function handleJoin() {
+      const nameInput = document.getElementById('name-input');
+      const name = nameInput.value.trim() || 'Anonymous';
+      localStorage.setItem('pixelName', name);
+      
+      // Hide modal, show room
+      document.getElementById('join-modal').classList.add('hidden');
+      document.getElementById('header').classList.remove('hidden');
+      document.getElementById('main-content').classList.remove('hidden');
+      
+      // Connect with the name
+      connect(name);
+    }
+    
+    document.getElementById('join-btn').onclick = handleJoin;
+    document.getElementById('name-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleJoin();
+    });
     
     // Initialize editor canvas
     function initEditor() {
@@ -445,9 +554,8 @@
     }
     
     // Connect to LiveKit room
-    async function connect() {
+    async function connect(participantName) {
       const status = document.getElementById('status');
-      const participantName = localStorage.getItem('pixelName') || 'Anonymous';
       
       try {
         // Get token from server
@@ -828,7 +936,7 @@
     initPalette();
     initGrid();
     setColor(currentColor);
-    connect();
+    // connect() is called from handleJoin() after user enters name
   </script>
 </body>
 </html>
